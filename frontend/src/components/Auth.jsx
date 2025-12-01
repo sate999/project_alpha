@@ -22,10 +22,10 @@ function Auth({ onLogin }) {
       } else {
         await register(username, email, password);
         setIsLogin(true);
-        setError("Registration successful! Please login.");
+        setError("회원가입 완료! 로그인해주세요.");
       }
     } catch (err) {
-      setError(err.response?.data?.error || "Something went wrong");
+      setError(err.response?.data?.error || "오류가 발생했습니다");
     } finally {
       setLoading(false);
     }
@@ -33,15 +33,15 @@ function Auth({ onLogin }) {
 
   return (
     <div className="auth-container">
-      <h2>{isLogin ? "Login" : "Register"}</h2>
+      <h2>{isLogin ? "로그인" : "회원가입"}</h2>
       
-      {error && <p style={{ color: error.includes("successful") ? "green" : "red" }}>{error}</p>}
+      {error && <p style={{ color: error.includes("완료") ? "green" : "red" }}>{error}</p>}
       
       <form onSubmit={handleSubmit}>
         <div>
           <input
             type="text"
-            placeholder="Username"
+            placeholder="아이디"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
@@ -52,7 +52,7 @@ function Auth({ onLogin }) {
           <div>
             <input
               type="email"
-              placeholder="Email"
+              placeholder="이메일"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -63,7 +63,7 @@ function Auth({ onLogin }) {
         <div>
           <input
             type="password"
-            placeholder="Password"
+            placeholder="비밀번호"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -71,14 +71,14 @@ function Auth({ onLogin }) {
         </div>
         
         <button type="submit" disabled={loading}>
-          {loading ? "Loading..." : isLogin ? "Login" : "Register"}
+          {loading ? "처리 중..." : isLogin ? "로그인" : "회원가입"}
         </button>
       </form>
       
       <p>
-        {isLogin ? "Don't have an account? " : "Already have an account? "}
+        {isLogin ? "계정이 없으신가요? " : "이미 계정이 있으신가요? "}
         <button type="button" onClick={() => setIsLogin(!isLogin)}>
-          {isLogin ? "Register" : "Login"}
+          {isLogin ? "회원가입" : "로그인"}
         </button>
       </p>
     </div>
