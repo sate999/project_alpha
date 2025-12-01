@@ -18,22 +18,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 기존 API
-export const getHealth = async () => {
-  const response = await api.get("/api/health");
-  return response.data;
-};
-
-export const getTest = async () => {
-  const response = await api.get("/api/test");
-  return response.data;
-};
-
-export const postEcho = async (data) => {
-  const response = await api.post("/api/echo", data);
-  return response.data;
-};
-
 // 인증 API
 export const register = async (username, email, password) => {
   const response = await api.post("/api/auth/register", { username, email, password });
@@ -73,6 +57,34 @@ export const updateProduct = async (id, data) => {
 
 export const deleteProduct = async (id) => {
   const response = await api.delete(`/api/products/${id}`);
+  return response.data;
+};
+
+// 파일 업로드
+export const uploadFile = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await api.post("/api/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
+// 찜하기 API
+export const getWishlist = async () => {
+  const response = await api.get("/api/wishlist");
+  return response.data;
+};
+
+export const addToWishlist = async (productId) => {
+  const response = await api.post(`/api/wishlist/${productId}`);
+  return response.data;
+};
+
+export const removeFromWishlist = async (productId) => {
+  const response = await api.delete(`/api/wishlist/${productId}`);
   return response.data;
 };
 

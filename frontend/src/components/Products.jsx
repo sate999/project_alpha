@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { getProducts, createProduct, updateProduct, deleteProduct } from "../services/api";
+import { getProducts, createProduct, updateProduct, deleteProduct, uploadFile, addToWishlist, removeFromWishlist } from "../services/api";
+
+const API_BASE_URL = "https://project-alpha-fjq9.onrender.com";
 
 function Products({ user }) {
   const [products, setProducts] = useState([]);
@@ -7,7 +9,15 @@ function Products({ user }) {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [formData, setFormData] = useState({ name: "", description: "", price: "" });
+  const [formData, setFormData] = useState({ 
+    name: "", 
+    description: "", 
+    price: "",
+    status: "판매중",
+    image_url: "",
+    video_url: ""
+  });
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -22,6 +32,25 @@ function Products({ user }) {
       setError("상품을 불러오는데 실패했습니다");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      const data = await uploadFile(file);
+      if (type === 'image') {
+        setFormData({ ...formData, image_url: data.url });
+      } else {
+        setFormData({ ...formData, video_url: data.url });
+      }
+    } catch (err) {
+      setError("파일 업로드에 실패했습니다");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -40,7 +69,7 @@ function Products({ user }) {
           price: parseFloat(formData.price)
         });
       }
-      setFormData({ name: "", description: "", price: "" });
+      setFormData({ name: "", description: "", price: "", status: "판매중", image_url: "", video_url: "" });
       setShowForm(false);
       setEditingProduct(null);
       fetchProducts();
@@ -56,7 +85,10 @@ function Products({ user }) {
     setFormData({
       name: product.name,
       description: product.description || "",
-      price: product.price.toString()
+      price: product.price.toString(),
+      status: product.status,
+      image_url: product.image_url || "",
+      video_url: product.video_url || ""
     });
     setShowForm(true);
   };
@@ -71,10 +103,23 @@ function Products({ user }) {
     }
   };
 
+  const handleWishlist = async (product) => {
+    try {
+      if (product.is_wishlisted) {
+        await removeFromWishlist(product.id);
+      } else {
+        await addToWishlist(product.id);
+      }
+      fetchProducts();
+    } catch (err) {
+      setError("찜하기 처리에 실패했습니다");
+    }
+  };
+
   const handleCancel = () => {
     setShowForm(false);
     setEditingProduct(null);
-    setFormData({ name: "", description: "", price: "" });
+    setFormData({ name: "", description: "", price: "", status: "판매중", image_url: "", video_url: "" });
   };
 
   const formatPrice = (price) => {
@@ -115,9 +160,49 @@ function Products({ user }) {
             onChange={(e) => setFormData({ ...formData, price: e.target.value })}
             required
           />
+          
+          <div className="file-upload-group">
+            <label>상품 이미지</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFileUpload(e, 'image')}
+              disabled={uploading}
+            />
+            {formData.image_url && (
+              <img src={`${API_BASE_URL}${formData.image_url}`} alt="미리보기" className="preview-image" />
+            )}
+          </div>
+
+          <div className="file-upload-group">
+            <label>상품 영상 (선택사항)</label>
+            <input
+              type="file"
+              accept="video/*"
+              onChange={(e) => handleFileUpload(e, 'video')}
+              disabled={uploading}
+            />
+            {formData.video_url && (
+              <video src={`${API_BASE_URL}${formData.video_url}`} controls className="preview-video" />
+            )}
+          </div>
+
+          {editingProduct && (
+            <div className="status-select">
+              <label>판매 상태</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              >
+                <option value="판매중">판매중</option>
+                <option value="판매완료">판매완료</option>
+              </select>
+            </div>
+          )}
+
           <div className="form-buttons">
-            <button type="submit" disabled={loading}>
-              {editingProduct ? "수정하기" : "등록하기"}
+            <button type="submit" disabled={loading || uploading}>
+              {uploading ? "업로드 중..." : editingProduct ? "수정하기" : "등록하기"}
             </button>
             <button type="button" className="secondary" onClick={handleCancel}>
               취소
@@ -135,22 +220,51 @@ function Products({ user }) {
           ) : (
             products.map((product) => (
               <div key={product.id} className="product-card">
+                {product.image_url && (
+                  <img 
+                    src={`${API_BASE_URL}${product.image_url}`} 
+                    alt={product.name} 
+                    className="product-image"
+                  />
+                )}
+                {product.video_url && (
+                  <video 
+                    src={`${API_BASE_URL}${product.video_url}`} 
+                    controls 
+                    className="product-video"
+                  />
+                )}
                 <div className="product-info">
-                  <h4>{product.name}</h4>
+                  <div className="product-title-row">
+                    <h4>{product.name}</h4>
+                    <span className={`status-badge ${product.status === '판매중' ? 'on-sale' : 'sold-out'}`}>
+                      {product.status}
+                    </span>
+                  </div>
                   <p className="product-description">{product.description}</p>
                   <p className="product-price">{formatPrice(product.price)}</p>
                   <p className="product-meta">판매자: {product.owner}</p>
                 </div>
-                {user.username === product.owner && (
-                  <div className="product-actions">
-                    <button className="secondary" onClick={() => handleEdit(product)}>
-                      수정
+                <div className="product-actions">
+                  {user.username !== product.owner && (
+                    <button 
+                      className={`wishlist-btn ${product.is_wishlisted ? 'wishlisted' : ''}`}
+                      onClick={() => handleWishlist(product)}
+                    >
+                      {product.is_wishlisted ? '❤️' : '🤍'}
                     </button>
-                    <button className="danger" onClick={() => handleDelete(product.id)}>
-                      삭제
-                    </button>
-                  </div>
-                )}
+                  )}
+                  {user.username === product.owner && (
+                    <>
+                      <button className="secondary" onClick={() => handleEdit(product)}>
+                        수정
+                      </button>
+                      <button className="danger" onClick={() => handleDelete(product.id)}>
+                        삭제
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))
           )}
