@@ -172,16 +172,6 @@ button.danger:hover:not(:disabled) {
   background: #dc2626;
 }
 
-/* Sections */
-.section {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 25px;
-  margin-bottom: 20px;
-  box-shadow: var(--shadow);
-}
-
 /* Inputs */
 input[type="text"],
 input[type="email"],
@@ -202,18 +192,6 @@ input:focus {
   outline: none;
   border-color: var(--accent-color);
   box-shadow: 0 0 0 3px rgba(255, 111, 0, 0.1);
-}
-
-/* Pre (JSON display) */
-pre {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 15px;
-  margin-top: 15px;
-  overflow-x: auto;
-  font-size: 0.9rem;
-  color: var(--text-primary);
 }
 
 /* Error/Success Messages */
@@ -280,17 +258,6 @@ pre {
 .auth-container > p button:hover {
   transform: none;
   color: var(--accent-hover);
-}
-
-/* Echo Input Group */
-.input-group {
-  display: flex;
-  gap: 10px;
-}
-
-.input-group input {
-  flex: 1;
-  margin-bottom: 0;
 }
 
 /* Loading */
@@ -440,17 +407,24 @@ pre {
   
   .header {
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     text-align: center;
   }
   
   .header-left {
     order: 1;
+    text-align: center;
   }
   
   .header-right {
     order: 0;
-    justify-content: flex-end;
+    position: absolute;
+    top: 20px;
+    right: 15px;
+  }
+  
+  .App {
+    position: relative;
   }
   
   .theme-toggle {
@@ -472,7 +446,6 @@ pre {
   
   .auth-container {
     padding: 25px 20px;
-    margin: 0 -5px;
     border-radius: 12px;
   }
   
@@ -519,27 +492,29 @@ pre {
     flex: 1;
     padding: 12px;
   }
-  
-  .input-group {
-    flex-direction: column;
-  }
-  
-  .input-group button {
-    width: 100%;
-  }
 }
 
 @media (max-width: 480px) {
   .App {
     padding: 15px 10px;
+    padding-top: 60px;
   }
   
   h1 {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
   }
   
   h2 {
     font-size: 0.9rem;
+  }
+  
+  .header {
+    margin-bottom: 30px;
+  }
+  
+  .header-right {
+    top: 15px;
+    right: 10px;
   }
   
   .auth-container {
@@ -555,7 +530,7 @@ pre {
   input[type="password"],
   input[type="number"] {
     padding: 14px;
-    font-size: 16px; /* iOS zoom 방지 */
+    font-size: 16px;
   }
   
   .product-form textarea {
