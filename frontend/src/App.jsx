@@ -3,10 +3,14 @@ import "./App.css";
 import { getMe } from "./services/api";
 import Auth from "./components/Auth";
 import Products from "./components/Products";
+import MyPage from "./components/MyPage";
+import Chat from "./components/Chat";
 
 function App() {
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+  const [currentPage, setCurrentPage] = useState("home");
+  const [chatProductId, setChatProductId] = useState(null);
 
   useEffect(() => {
     checkAuth();
@@ -36,6 +40,12 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     setUser(null);
+    setCurrentPage("home");
+  };
+
+  const openChat = (productId) => {
+    setChatProductId(productId);
+    setCurrentPage("chat");
   };
 
   if (!user) {
@@ -74,7 +84,30 @@ function App() {
         <button className="danger" onClick={handleLogout}>로그아웃</button>
       </div>
 
-      <Products user={user} />
+      {currentPage === "home" && (
+        <>
+          <div className="nav-buttons">
+            <button onClick={() => setCurrentPage("mypage")}>👤 마이페이지</button>
+            <button onClick={() => setCurrentPage("chat")}>💬 채팅</button>
+          </div>
+          <Products user={user} onStartChat={openChat} />
+        </>
+      )}
+
+      {currentPage === "mypage" && (
+        <MyPage user={user} onBack={() => setCurrentPage("home")} />
+      )}
+
+      {currentPage === "chat" && (
+        <Chat 
+          user={user} 
+          onBack={() => {
+            setCurrentPage("home");
+            setChatProductId(null);
+          }}
+          initialProductId={chatProductId}
+        />
+      )}
     </div>
   );
 }

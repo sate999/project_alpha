@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -19,7 +20,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov', 'webm'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB 제한
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -29,12 +30,16 @@ app.config['JWT_HEADER_NAME'] = 'Authorization'
 app.config['JWT_HEADER_TYPE'] = 'Bearer'
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 jwt = JWTManager(app)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# User 모델
+# =====================
+# Models
+# =====================
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -49,13 +54,12 @@ class User(db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-# Product 모델
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     price = db.Column(db.Float, nullable=False)
-    status = db.Column(db.String(20), default='판매중')  # 판매중, 판매완료
+    status = db.Column(db.String(20), default='판매중')
     image_url = db.Column(db.String(500))
     video_url = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -83,18 +87,37 @@ class Product(db.Model):
             'is_wishlisted': is_wishlisted
         }
 
-# Wishlist 모델
 class Wishlist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# DB 생성
-with app.app_context():
-    db.create_all()
+class ChatRoom(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    buyer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    seller_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    product = db.relationship('Product', backref='chat_rooms')
+    buyer = db.relationship('User', foreign_keys=[buyer_id], backref='buying_chats')
+    seller = db.relationship('User', foreign_keys=[seller_id], backref='selling_chats')
+    messages = db.relationship('Message', backref='chat_room', lazy=True, order_by='Message.created_at')
 
-# 파일 업로드 라우트
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    chat_room_id = db.Column(db.Integer, db.ForeignKey('chat_room.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    sender = db.relationship('User', backref='sent_messages')
+
+# =====================
+# Routes
+# =====================
+
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
@@ -117,7 +140,6 @@ def upload_file():
     
     return jsonify({"error": "File type not allowed"}), 400
 
-# 기존 라우트
 @app.route('/')
 def home():
     return jsonify({"message": "Welcome to 유니브당근 API"})
@@ -126,7 +148,10 @@ def home():
 def health():
     return jsonify({"status": "healthy"})
 
-# 인증 라우트
+# =====================
+# Auth Routes
+# =====================
+
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -193,7 +218,10 @@ def get_current_user():
         "email": user.email
     })
 
-# 상품 CRUD 라우트
+# =====================
+# Product Routes
+# =====================
+
 @app.route('/api/products', methods=['GET'])
 @jwt_required(optional=True)
 def get_products():
@@ -273,7 +301,10 @@ def delete_product(id):
     
     return jsonify({"message": "Product deleted"})
 
-# 찜하기 라우트
+# =====================
+# Wishlist Routes
+# =====================
+
 @app.route('/api/wishlist', methods=['GET'])
 @jwt_required()
 def get_wishlist():
@@ -310,6 +341,126 @@ def remove_from_wishlist(product_id):
     db.session.commit()
     
     return jsonify({"message": "Removed from wishlist"})
+
+# =====================
+# MyPage Routes
+# =====================
+
+@app.route('/api/my/products', methods=['GET'])
+@jwt_required()
+def get_my_products():
+    user_id = get_jwt_identity()
+    products = Product.query.filter_by(user_id=int(user_id)).order_by(Product.created_at.desc()).all()
+    return jsonify([p.to_dict(user_id=int(user_id)) for p in products])
+
+# =====================
+# Chat Routes
+# =====================
+
+@app.route('/api/chat/room/<int:product_id>', methods=['POST'])
+@jwt_required()
+def create_or_get_chat_room(product_id):
+    user_id = int(get_jwt_identity())
+    product = Product.query.get_or_404(product_id)
+    
+    if product.user_id == user_id:
+        return jsonify({"error": "자신의 상품에는 채팅할 수 없습니다"}), 400
+    
+    chat_room = ChatRoom.query.filter_by(
+        product_id=product_id,
+        buyer_id=user_id
+    ).first()
+    
+    if not chat_room:
+        chat_room = ChatRoom(
+            product_id=product_id,
+            buyer_id=user_id,
+            seller_id=product.user_id
+        )
+        db.session.add(chat_room)
+        db.session.commit()
+    
+    return jsonify({
+        "id": chat_room.id,
+        "product": product.to_dict(),
+        "buyer": chat_room.buyer.username,
+        "seller": chat_room.seller.username
+    })
+
+@app.route('/api/chat/rooms', methods=['GET'])
+@jwt_required()
+def get_my_chat_rooms():
+    user_id = int(get_jwt_identity())
+    
+    chat_rooms = ChatRoom.query.filter(
+        (ChatRoom.buyer_id == user_id) | (ChatRoom.seller_id == user_id)
+    ).order_by(ChatRoom.created_at.desc()).all()
+    
+    result = []
+    for room in chat_rooms:
+        last_message = Message.query.filter_by(chat_room_id=room.id).order_by(Message.created_at.desc()).first()
+        result.append({
+            "id": room.id,
+            "product": {"id": room.product.id, "name": room.product.name, "image_url": room.product.image_url},
+            "other_user": room.seller.username if room.buyer_id == user_id else room.buyer.username,
+            "last_message": last_message.content if last_message else None,
+            "last_message_time": last_message.created_at.isoformat() if last_message else None
+        })
+    
+    return jsonify(result)
+
+@app.route('/api/chat/room/<int:room_id>/messages', methods=['POST'])
+@jwt_required()
+def send_message(room_id):
+    user_id = int(get_jwt_identity())
+    chat_room = ChatRoom.query.get_or_404(room_id)
+    
+    if chat_room.buyer_id != user_id and chat_room.seller_id != user_id:
+        return jsonify({"error": "권한이 없습니다"}), 403
+    
+    data = request.get_json()
+    content = data.get('content')
+    
+    if not content:
+        return jsonify({"error": "메시지 내용이 필요합니다"}), 400
+    
+    message = Message(
+        chat_room_id=room_id,
+        sender_id=user_id,
+        content=content
+    )
+    db.session.add(message)
+    db.session.commit()
+    
+    return jsonify({
+        "id": message.id,
+        "sender": message.sender.username,
+        "content": message.content,
+        "created_at": message.created_at.isoformat()
+    }), 201
+
+@app.route('/api/chat/room/<int:room_id>/messages', methods=['GET'])
+@jwt_required()
+def get_messages(room_id):
+    user_id = int(get_jwt_identity())
+    chat_room = ChatRoom.query.get_or_404(room_id)
+    
+    if chat_room.buyer_id != user_id and chat_room.seller_id != user_id:
+        return jsonify({"error": "권한이 없습니다"}), 403
+    
+    messages = Message.query.filter_by(chat_room_id=room_id).order_by(Message.created_at.asc()).all()
+    
+    return jsonify([{
+        "id": m.id,
+        "sender": m.sender.username,
+        "sender_id": m.sender_id,
+        "content": m.content,
+        "created_at": m.created_at.isoformat()
+    } for m in messages])
+
+# =====================
+# Run
+# =====================
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "https://project-alpha-fjq9.onrender.com";
+const API_BASE_URL = "http://localhost:5000";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -89,3 +89,30 @@ export const removeFromWishlist = async (productId) => {
 };
 
 export default api;
+
+// 마이페이지 API
+export const getMyProducts = async () => {
+  const response = await api.get("/api/my/products");
+  return response.data;
+};
+
+// 채팅 API
+export const createChatRoom = async (productId) => {
+  const response = await api.post(`/api/chat/room/${productId}`);
+  return response.data;
+};
+
+export const getMyChatRooms = async () => {
+  const response = await api.get("/api/chat/rooms");
+  return response.data;
+};
+
+export const getMessages = async (roomId) => {
+  const response = await api.get(`/api/chat/room/${roomId}/messages`);
+  return response.data;
+};
+
+export const sendMessage = async (roomId, content) => {
+  const response = await api.post(`/api/chat/room/${roomId}/messages`, { content });
+  return response.data;
+};

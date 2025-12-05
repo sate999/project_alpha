@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { getProducts, createProduct, updateProduct, deleteProduct, uploadFile, addToWishlist, removeFromWishlist } from "../services/api";
 
-const API_BASE_URL = "https://project-alpha-fjq9.onrender.com";
+const API_BASE_URL = "http://localhost:5000";
 
-function Products({ user }) {
+function Products({ user, onStartChat }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -35,6 +35,20 @@ function Products({ user }) {
     }
   };
 
+  const formatNumberWithComma = (value) => {
+    const number = value.replace(/[^0-9]/g, '');
+    return number.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  const removeComma = (value) => {
+    return value.replace(/,/g, '');
+  };
+
+  const handlePriceChange = (e) => {
+    const formatted = formatNumberWithComma(e.target.value);
+    setFormData({ ...formData, price: formatted });
+  };
+
   const handleFileUpload = async (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -58,15 +72,16 @@ function Products({ user }) {
     e.preventDefault();
     try {
       setLoading(true);
+      const priceNumber = parseFloat(removeComma(formData.price));
       if (editingProduct) {
         await updateProduct(editingProduct.id, {
           ...formData,
-          price: parseFloat(formData.price)
+          price: priceNumber
         });
       } else {
         await createProduct({
           ...formData,
-          price: parseFloat(formData.price)
+          price: priceNumber
         });
       }
       setFormData({ name: "", description: "", price: "", status: "판매중", image_url: "", video_url: "" });
@@ -85,7 +100,7 @@ function Products({ user }) {
     setFormData({
       name: product.name,
       description: product.description || "",
-      price: product.price.toString(),
+      price: formatNumberWithComma(product.price.toString()),
       status: product.status,
       image_url: product.image_url || "",
       video_url: product.video_url || ""
@@ -153,11 +168,10 @@ function Products({ user }) {
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           />
           <input
-            type="number"
-            step="100"
+            type="text"
             placeholder="가격 (원)"
             value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+            onChange={handlePriceChange}
             required
           />
           
@@ -247,12 +261,15 @@ function Products({ user }) {
                 </div>
                 <div className="product-actions">
                   {user.username !== product.owner && (
-                    <button 
-                      className={`wishlist-btn ${product.is_wishlisted ? 'wishlisted' : ''}`}
-                      onClick={() => handleWishlist(product)}
-                    >
-                      {product.is_wishlisted ? '❤️' : '🤍'}
-                    </button>
+                    <>
+                      <button onClick={() => onStartChat(product.id)}>💬</button>
+                      <button 
+                        className={`wishlist-btn ${product.is_wishlisted ? 'wishlisted' : ''}`}
+                        onClick={() => handleWishlist(product)}
+                      >
+                        {product.is_wishlisted ? '❤️' : '🤍'}
+                      </button>
+                    </>
                   )}
                   {user.username === product.owner && (
                     <>
