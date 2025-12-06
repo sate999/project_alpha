@@ -1,16 +1,24 @@
-from flask import Flask, jsonify, request, send_from_directory
-from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-from datetime import timedelta, datetime
-import os
-from dotenv import load_dotenv
+#================
+# 유니브 당근 백엔드 API 서버
+# Flask 기반 REST API 서버
+#================
 
+
+from flask import Flask, jsonify, request, send_from_directory  #flask 웹 프레임워크 및 유틸
+from flask_cors import CORS #Cross-Origin Resource Sharing 허용 (프론트엔드 통신용)
+from flask_sqlalchemy import SQLAlchemy #SQL ORM (데이터베이스 객체 매핑)
+from flask_migrate import Migrate #데이터베이스 마이그레이션 관리
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity  #JWT 인증
+from werkzeug.security import generate_password_hash, check_password_hash #비밀번호 해싱
+from werkzeug.utils import secure_filename  #안전한 파일명 멏리
+from datetime import timedelta, datetime #시간 관련 유틸
+import os   #운영체제 파일경로 관련 기능
+from dotenv import load_dotenv #.env파일에서 환경변수 가져옴
+
+# 환경변수 로드 (.env 파일이 있으면 읽어옴)
 load_dotenv()
 
+# Flask 앱 초기화
 app = Flask(__name__)
 CORS(app)
 
@@ -19,6 +27,7 @@ UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov', 'webm'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# 앱 설정
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
@@ -29,6 +38,7 @@ app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_HEADER_NAME'] = 'Authorization'
 app.config['JWT_HEADER_TYPE'] = 'Bearer'
 
+# 확장 기능 초기화
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
@@ -36,11 +46,9 @@ jwt = JWTManager(app)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# =====================
-# Models
-# =====================
-
+#데이터베이스 모델 정의
 class User(db.Model):
+    #사용자모델 - 회원 정보 저장
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -55,6 +63,7 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
 class Product(db.Model):
+    #상품 모델 - 판매 상품 정보 저장
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
@@ -88,12 +97,14 @@ class Product(db.Model):
         }
 
 class Wishlist(db.Model):
+    #찜 목록 모델 - 사용자가 찜한 상품 저장
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class ChatRoom(db.Model):
+    #채팅방 모델 - 구매자와 판매자 간의 채팅방
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     buyer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -106,6 +117,7 @@ class ChatRoom(db.Model):
     messages = db.relationship('Message', backref='chat_room', lazy=True, order_by='Message.created_at')
 
 class Message(db.Model):
+    #메시지 모델 - 채팅 메시지 저장
     id = db.Column(db.Integer, primary_key=True)
     chat_room_id = db.Column(db.Integer, db.ForeignKey('chat_room.id'), nullable=False)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -114,10 +126,9 @@ class Message(db.Model):
     
     sender = db.relationship('User', backref='sent_messages')
 
-# =====================
-# Routes
-# =====================
+#API 라우트
 
+#파일 업로드 라우트
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
@@ -140,6 +151,7 @@ def upload_file():
     
     return jsonify({"error": "File type not allowed"}), 400
 
+#기본 라우트
 @app.route('/')
 def home():
     return jsonify({"message": "Welcome to 유니브당근 API"})
@@ -148,9 +160,7 @@ def home():
 def health():
     return jsonify({"status": "healthy"})
 
-# =====================
-# Auth Routes
-# =====================
+#인증 API
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
@@ -160,23 +170,28 @@ def register():
     email = data.get('email')
     password = data.get('password')
     
+    #필수 필드 검증
     if not username or not email or not password:
         return jsonify({"error": "Missing required fields"}), 400
     
+    #중복 검사
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Username already exists"}), 400
     
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already exists"}), 400
     
+    #새 사용자 생성
     user = User(username=username, email=email)
     user.set_password(password)
     
+    # DB세이브
     db.session.add(user)
     db.session.commit()
     
     return jsonify({"message": "User registered successfully"}), 201
 
+#로그인
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -218,9 +233,7 @@ def get_current_user():
         "email": user.email
     })
 
-# =====================
-# Product Routes
-# =====================
+#상품 API
 
 @app.route('/api/products', methods=['GET'])
 @jwt_required(optional=True)
@@ -301,9 +314,7 @@ def delete_product(id):
     
     return jsonify({"message": "Product deleted"})
 
-# =====================
-# Wishlist Routes
-# =====================
+#위시리스트 API
 
 @app.route('/api/wishlist', methods=['GET'])
 @jwt_required()
@@ -342,9 +353,7 @@ def remove_from_wishlist(product_id):
     
     return jsonify({"message": "Removed from wishlist"})
 
-# =====================
-# MyPage Routes
-# =====================
+#마이페이지 API
 
 @app.route('/api/my/products', methods=['GET'])
 @jwt_required()
@@ -353,9 +362,7 @@ def get_my_products():
     products = Product.query.filter_by(user_id=int(user_id)).order_by(Product.created_at.desc()).all()
     return jsonify([p.to_dict(user_id=int(user_id)) for p in products])
 
-# =====================
-# Chat Routes
-# =====================
+#채팅 API
 
 @app.route('/api/chat/room/<int:product_id>', methods=['POST'])
 @jwt_required()
@@ -458,9 +465,11 @@ def get_messages(room_id):
         "created_at": m.created_at.isoformat()
     } for m in messages])
 
-# =====================
-# Run
-# =====================
+#서버 실행
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+    # 개발 서버 실행
+    # debug=True: 디버그 모드 (코드 변경 시 자동 재시작, 에러 상세 표시)
+    # host='0.0.0.0': 모든 네트워크 인터페이스에서 접근 허용
+    # port=5000: 5000번 포트 사용
