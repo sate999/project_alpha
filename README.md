@@ -1,16 +1,17 @@
-# Project Alpha
+# 유니브 당근 (Univ_Cararot)
 
+전국 대학생들 간 중고거래 플랫폼 개발
 React.js (Frontend) + Flask (Python Backend) application
 
-## Tech Stack
+## 적용 기술 (Tech Stack)
 
 - **Frontend**: React.js with Vite
 - **Backend**: Flask (Python)
 - **Environment**: WSL Ubuntu
 
-## Setup Instructions
+## 설치 및 실행 (Setup Instructions)
 
-### Backend Setup
+### 백엔드 설치 및 실행 (Backend Setup)
 
 ```bash
 cd backend
@@ -22,7 +23,7 @@ python app.py
 
 Backend runs on: http://localhost:5000
 
-### Frontend Setup
+### 프론트엔드 설치 및 실행 (Frontend Setup)
 
 ```bash
 cd frontend
@@ -32,7 +33,7 @@ npm run dev
 
 Frontend runs on: http://localhost:5173
 
-## Project Structure
+## 프로젝트 구조 (Project Structure)
 
 ```
 project_alpha/
