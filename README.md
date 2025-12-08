@@ -41,5 +41,3 @@ project_alpha/
 ├── backend/           # Flask API
 └── README.md
 ```
-
-EOF
